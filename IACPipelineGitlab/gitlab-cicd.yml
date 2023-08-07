@@ -1,0 +1,47 @@
+# Define the stages of the pipeline
+stages:
+  - validate
+  - scan
+  - deploy
+
+# Define global variables or environment variables here
+variables:
+  TERRAFORM_VERSION: "1.5.4"  # Terraform version
+  TF_WORKING_DIR: "AWS/TerraformFiles"  # Path to your Terraform code
+
+# Define the validation stage
+validate:
+  stage: validate
+  image: hashicorp/terraform:$TERRAFORM_VERSION
+  script:
+    - cd $TF_WORKING_DIR
+    - terraform init
+    - terraform validate
+  tags:
+    - terraform-agent  # Specify the tag of the runner with Terraform tools
+
+# Define the scan stage
+scan:
+  stage: scan
+  image: wata727/tflint:latest  # tflint image
+  script:
+    - cd $TF_WORKING_DIR
+    - terraform init
+    - tflint --deep  # tflint analyzing the Terraform code recursively
+  tags:
+    - terraform-agent  # Tag for the Terraform runner
+
+# Define the deploy stage
+deploy:
+  stage: deploy
+  image: hashicorp/terraform:$TERRAFORM_VERSION
+  script:
+    - cd $TF_WORKING_DIR
+    - terraform init
+    - terraform plan -out=tfplan
+    - terraform show -no-color tfplan  # Displaying the execution plan for manual review
+    - echo "Do you want to apply the above changes? [y/n]: "
+    - read APPLY_CONFIRM
+    - if [[ "$APPLY_CONFIRM" == "y" ]]; then terraform apply tfplan; else echo "Skipping apply."; fi
+  tags:
+    - terraform-agent  # Tag for the Terraform runner
